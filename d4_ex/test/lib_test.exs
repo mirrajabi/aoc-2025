@@ -35,7 +35,7 @@ defmodule LibTest do
       |> String.trim()
 
     assert out.accessible_count == 13
-    assert out.printable == expected
+    assert out.diff == expected
   end
 
   test "personal case" do
@@ -185,6 +185,53 @@ defmodule LibTest do
       |> String.trim()
 
     assert out.accessible_count == 1384
-    assert out.printable == expected
+    assert out.diff == expected
+  end
+
+  test "sample case - challenge 2" do
+    out =
+      """
+      ..@@.@@@@.
+      @@@.@.@.@@
+      @@@@@.@.@@
+      @.@@@@..@.
+      @@.@@@@.@@
+      .@@@@@@@.@
+      .@.@.@.@@@
+      @.@@@.@@@@
+      .@@@@@@@@.
+      @.@.@@@.@.
+      """
+      |> Lib.clean_all_possible_rolls()
+      |> Enum.at(-1)
+
+    expected =
+      """
+      ..........
+      ..........
+      ..........
+      ...x@@....
+      ...@@@@...
+      ...@@@@@..
+      ...@.@.@@.
+      ...@@.@@@.
+      ...@@@@@..
+      ....@@@...
+      """
+      |> String.trim()
+
+    assert out.diff == expected
+    assert out.total_cleaned == 43
+  end
+
+  # This is waaaaaay too slow! 133seconds!
+  @tag timeout: :infinity
+  test "personal case - challenge 2" do
+    out =
+      File.read!("./priv/input.txt")
+      |> Lib.clean_all_possible_rolls()
+      |> Enum.at(-1)
+
+    assert out.total_cleaned == 8013
   end
 end
