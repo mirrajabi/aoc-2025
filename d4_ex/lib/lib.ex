@@ -47,10 +47,16 @@ defmodule Lib do
       if i < 0 || i >= rows || j < 0 || j >= cols, do: nil, else: cols * i + j
     end
 
+    # This is the closest thing to an array level random access performance we can get in Elixir
+    # Initially I had a list and was accessing elements using Enum.at/2 but
+    # that was insanely slow. It took 133s to go through the personal case.
+    # Now with tuples it takes less than a 500ms
+    lines_tuple = List.to_tuple(lines)
+
     counts =
       for i <- 0..(rows - 1) do
         for j <- 0..(cols - 1) do
-          count_filled_adjacents(lines, index_of, i, j)
+          count_filled_adjacents(lines_tuple, index_of, i, j)
         end
       end
       |> List.flatten()
@@ -88,13 +94,13 @@ defmodule Lib do
     %{accessible_count: accessible_count, state: state, diff: diff}
   end
 
-  defp count_filled_adjacents(grid, index_of, i, j) do
+  defp count_filled_adjacents(grid_tuple, index_of, i, j) do
     Enum.reduce(@directions, 0, fn {di, dj}, acc ->
       oi = i + di
       oj = j + dj
 
       idx = index_of.(oi, oj)
-      if idx == nil, do: acc, else: acc + Enum.at(grid, idx)
+      if idx == nil, do: acc, else: acc + elem(grid_tuple, idx)
     end)
   end
 end

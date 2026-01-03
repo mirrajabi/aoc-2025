@@ -224,13 +224,17 @@ defmodule LibTest do
     assert out.total_cleaned == 43
   end
 
-  # This is waaaaaay too slow! 133seconds!
-  @tag timeout: :infinity
   test "personal case - challenge 2" do
+    time_start_nano = :os.system_time(:nanosecond)
+
     out =
       File.read!("./priv/input.txt")
       |> Lib.clean_all_possible_rolls()
       |> Enum.at(-1)
+
+    time_end_nano = :os.system_time(:nanosecond)
+    time_diff_milli = div(time_end_nano - time_start_nano, 1_000_000)
+    IO.puts("Time taken (ms): #{time_diff_milli}")
 
     assert out.total_cleaned == 8013
   end
