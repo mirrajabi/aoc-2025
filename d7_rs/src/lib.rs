@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 const CHAR_START: u8 = b'S';
 const CHAR_SPACE: u8 = b'.';
 const CHAR_BEAM: u8 = b'|';
 const CHAR_SPLITTER: u8 = b'^';
 const CHAR_SPLITTED: u8 = b'+';
 
-fn calc(grid: &str) -> u32 {
+pub fn calc(grid: &str) -> (u32, u64) {
     let mut source_grid = grid.lines().flat_map(|f| f.bytes()).collect::<Vec<u8>>();
 
     let len = source_grid.len();
@@ -56,7 +58,10 @@ fn calc(grid: &str) -> u32 {
     let split_count = traverse(&mut source_grid, &index_of, &print_fn, 1, sx.unwrap());
     print_fn(&source_grid);
     println!("Split count: {:?}", split_count);
-    split_count
+
+    let total_possibilities =
+        count_paths(&source_grid, &mut HashMap::new(), w, h, 1, sx.unwrap(), 0);
+    (split_count, total_possibilities)
 }
 
 fn traverse(
@@ -66,7 +71,6 @@ fn traverse(
     current_y: usize,
     current_x: usize,
 ) -> u32 {
-    // print_fn(&state);
     let idx_down = index_of_fn(current_y as isize + 1, current_x as isize);
     if let None = idx_down {
         return 0;
@@ -81,19 +85,54 @@ fn traverse(
         CHAR_SPLITTER => {
             state[idx_down] = CHAR_SPLITTED;
             let mut count = 1;
-            if let Some(idx_se) = index_of_fn(current_y as isize + 2, current_x as isize + 1) {
+            if let Some(idx_se) = index_of_fn(current_y as isize + 1, current_x as isize + 1) {
                 state[idx_se] = CHAR_BEAM;
 
-                count += traverse(state, index_of_fn, print_fn, current_y + 2, current_x + 1);
+                count += traverse(state, index_of_fn, print_fn, current_y + 1, current_x + 1);
             }
-            if let Some(idx_sw) = index_of_fn(current_y as isize + 2, current_x as isize - 1) {
+            if let Some(idx_sw) = index_of_fn(current_y as isize + 1, current_x as isize - 1) {
                 state[idx_sw] = CHAR_BEAM;
-                count += traverse(state, index_of_fn, print_fn, current_y + 2, current_x - 1);
+                count += traverse(state, index_of_fn, print_fn, current_y + 1, current_x - 1);
             }
             count
         }
         _ => 0,
     }
+}
+
+fn count_paths(
+    state: &[u8],
+    memo: &mut HashMap<(usize, usize), u64>,
+    w: usize,
+    h: usize,
+    y: usize,
+    x: usize,
+    possibilities: u32,
+) -> u64 {
+    if y >= h - 1 {
+        return 1;
+    }
+
+    if let Some(&cache) = memo.get(&(y, x)) {
+        return cache;
+    }
+
+    let result = match state[y * w + x] {
+        CHAR_BEAM => count_paths(state, memo, w, h, y + 1, x, possibilities),
+        CHAR_SPLITTED => {
+            let mut count = 0;
+            if x + 1 < w {
+                count += count_paths(state, memo, w, h, y + 1, x + 1, possibilities + 1);
+            }
+            if (x as isize) - 1 >= 0 {
+                count += count_paths(state, memo, w, h, y + 1, x - 1, possibilities + 1);
+            }
+            count
+        }
+        _ => panic!("Shouldn't happen!"),
+    };
+    memo.insert((y, x), result);
+    result
 }
 
 #[cfg(test)]
@@ -112,9 +151,9 @@ mod tests {
         let mut grid = String::new();
         if let Ok(read_bytes) = buf.read_to_string(&mut grid) {
             println!("Read {} bytes", read_bytes);
-            let split_count = calc(&grid);
-
+            let (split_count, possibilities) = calc(&grid);
             assert_eq!(21, split_count);
+            assert_eq!(40, possibilities);
         } else {
             println!("Explosion!");
         }
@@ -125,9 +164,10 @@ mod tests {
         let file = File::open("./assets/personal.txt").unwrap();
         let mut buf = BufReader::new(file);
         let mut grid = String::new();
-        buf.read_to_string(&mut grid);
-        let split_count = calc(&grid);
+        buf.read_to_string(&mut grid).unwrap();
+        let (split_count, possibilities) = calc(&grid);
 
         assert_eq!(1541, split_count);
+        assert_eq!(80158285728929, possibilities);
     }
 }
