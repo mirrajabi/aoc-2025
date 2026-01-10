@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{BufRead, BufReader},
+    usize,
 };
 
 use bevy::{
@@ -11,9 +12,15 @@ use bevy::{
 };
 use rand::Rng;
 
+#[derive(Clone, Copy)]
+struct UFElem {
+    parent: u16,
+    size: usize,
+}
+
 type Point = (u32, u32, u32);
 
-pub type TaskType = (usize, Vec<Point>, Vec<Circuit>);
+pub type TaskType = (usize, Vec<Point>, Vec<Circuit>, Option<u32>);
 
 #[derive(Resource)]
 pub struct ComputeTask(pub Task<TaskType>);
@@ -35,18 +42,28 @@ pub fn calculate(file_path: &str, limit: Option<usize>) -> TaskType {
         }
     }
     d.sort_unstable_by_key(|p| p.2);
-    let mut set = (0..points.len()).map(|i| i as u16).collect::<Vec<u16>>();
+    let mut set = (0..points.len())
+        .map(|i| UFElem {
+            parent: i as u16,
+            size: 1,
+        })
+        .collect::<Vec<UFElem>>();
     let limit = if let Some(limit) = limit {
         limit
     } else {
         usize::MAX
     };
+
+    let mut last_pair = None;
     for &(i, j, _) in d.iter().take(limit) {
-        union(&mut set, i, j);
+        if union(&mut set, i, j) == points.len() {
+            last_pair = Some((i, j));
+            break;
+        }
     }
     let mut circuits = vec![Vec::<Vec3>::new(); points.len()];
     for i in 0..points.len() {
-        circuits[find(&mut set, i as u16) as usize].push(Vec3::new(
+        circuits[find(&mut set, i as u16).parent as usize].push(Vec3::new(
             points[i].0 as f32,
             points[i].1 as f32,
             points[i].2 as f32,
@@ -66,7 +83,13 @@ pub fn calculate(file_path: &str, limit: Option<usize>) -> TaskType {
             jboxes: f,
         })
         .collect();
-    (prod, points, circuits)
+
+    let last_pair_x_product = if let Some(last_pair) = last_pair {
+        Some(points[last_pair.0 as usize].0 * points[last_pair.1 as usize].0)
+    } else {
+        None
+    };
+    (prod, points, circuits, last_pair_x_product)
 }
 
 fn get_points(buf: &mut BufReader<File>) -> Vec<Point> {
@@ -89,19 +112,28 @@ fn distance_euclidean(a: Point, b: Point) -> u64 {
     dx * dx + dy * dy + dz * dz
 }
 
-pub fn find(set: &mut Vec<u16>, x: u16) -> u16 {
+fn find(set: &mut Vec<UFElem>, x: u16) -> UFElem {
     let xu = x as usize;
-    if x == set[xu] {
-        x
+    if x == set[xu].parent {
+        set[xu]
     } else {
-        set[xu] = find(set, set[xu]);
+        set[xu] = find(set, set[xu].parent);
         set[xu]
     }
 }
 
-pub fn union(set: &mut Vec<u16>, x: u16, y: u16) {
-    let x_idx = find(set, x) as usize;
-    set[x_idx] = find(set, y);
+fn union(set: &mut Vec<UFElem>, x: u16, y: u16) -> usize {
+    let x = find(set, x);
+    let y = find(set, y);
+
+    if x.parent == y.parent {
+        x.size
+    } else {
+        let combined_size = x.size + y.size;
+        set[x.parent as usize].parent = y.parent as u16;
+        set[y.parent as usize].size += x.size;
+        combined_size
+    }
 }
 
 #[cfg(test)]
@@ -110,13 +142,25 @@ mod tests {
 
     #[test]
     fn test_sample() {
-        let (product, _, _) = calculate("./assets/sample.txt", Some(10));
+        let (product, _, _, _) = calculate("./assets/sample.txt", Some(10));
         assert_eq!(40, product);
     }
 
     #[test]
     fn test_personal_case() {
-        let (product, _, _) = calculate("./assets/personal.txt", Some(1000));
+        let (product, _, _, _) = calculate("./assets/personal.txt", Some(1000));
         assert_eq!(164475, product);
+    }
+
+    #[test]
+    fn test_sample_pt2() {
+        let (_, _, _, last_pair_x_product) = calculate("./assets/sample.txt", None);
+        assert_eq!(Some(25272), last_pair_x_product);
+    }
+
+    #[test]
+    fn test_personal_pt2() {
+        let (_, _, _, last_pair_x_product) = calculate("./assets/personal.txt", None);
+        assert_eq!(Some(169521198), last_pair_x_product);
     }
 }

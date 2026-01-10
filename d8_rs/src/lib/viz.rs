@@ -28,7 +28,8 @@ impl Plugin for VizPlugin {
 
 fn start_calculation(mut commands: Commands) {
     let pool = AsyncComputeTaskPool::get();
-    let task = pool.spawn(async { calculate("./assets/personal.txt", Some(10)) });
+    // limit=1000 results in a pretty visualization where dots aren't all connected.
+    let task = pool.spawn(async { calculate("./assets/personal.txt", Some(1000)) });
     commands.insert_resource(ComputeTask(task));
 }
 
@@ -42,7 +43,7 @@ fn poll_calculation(
     let Some(mut task) = task else { return };
 
     let poll = future::block_on(future::poll_once(&mut task.0));
-    let Some((_, points, circuits)) = poll else {
+    let Some((_, points, circuits, _)) = poll else {
         return;
     };
 
